@@ -11,7 +11,6 @@ from gi.repository import Gtk, Gdk
 
 from zim.gui.pageview import PageViewExtension
 from zim.gui.widgets import BrowserTreeView, ScrolledWindow
-from zim.notebook.index.tags import TagsView
 
 
 logger = getLogger('zim.plugins.inlinesuggestions')
@@ -23,7 +22,7 @@ def iter_to_pos(iter: Gtk.TextIter) -> LinePos:
 	return LinePos(iter.get_line(), iter.get_line_offset())
 
 
-class InlineSuggestions(PageViewExtension, metaclass=ABCMeta):
+class AbstractSuggestions(metaclass=ABCMeta):
 
 	@abstractmethod
 	def fetch_suggestions(self):
@@ -33,6 +32,9 @@ class InlineSuggestions(PageViewExtension, metaclass=ABCMeta):
 		accessor (optional): a function for unwrapping the entries to a str
 		"""
 		return ([], lambda x: x)
+
+
+class InlineSuggestions(PageViewExtension):
 
 	def __init__(self, plugin, pageview, activation_char):
 		super().__init__(plugin, pageview)
@@ -294,3 +296,6 @@ class SuggestionsPopover(Gtk.Popover):
 			# is there any entry left or is the list empty?
 			selected = model[treeiter][self.DATA_COL]
 			self.callback_insert_selected(selected)
+
+
+AbstractSuggestions.register(InlineSuggestions)
