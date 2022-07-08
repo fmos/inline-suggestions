@@ -6,6 +6,7 @@
 from zim.plugins import PluginClass
 
 from . import tagsuggestions
+from . import linksuggestions
 
 
 class InlineSuggestionsPlugin(PluginClass):
@@ -22,3 +23,6 @@ It is inspired by the Tag Autocompletion plugin from Murat Güven.
 
 
 TagSuggestions = tagsuggestions.TagSuggestions
+
+# AbsoluteLinkSuggestions = linksuggestions.AbsoluteLinkSuggestions
+# RelativeLinkSuggestions = linksuggestions.RelativeLinkSuggestions
