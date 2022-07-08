@@ -3,9 +3,9 @@
 # Copyright 2022 Fabian Stanke
 #
 
-import logging
-
+from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+from logging import getLogger
 
 from gi.repository import Gtk, Gdk
 
@@ -14,9 +14,7 @@ from zim.gui.widgets import BrowserTreeView, ScrolledWindow
 from zim.notebook.index.tags import TagsView
 
 
-activation_char = "@"
-
-logger = logging.getLogger('zim.plugins.inlinesuggestions')
+logger = getLogger('zim.plugins.inlinesuggestions')
 
 LinePos = namedtuple("LinePos", "line offset")
 
@@ -25,16 +23,27 @@ def iter_to_pos(iter: Gtk.TextIter) -> LinePos:
 	return LinePos(iter.get_line(), iter.get_line_offset())
 
 
-class TagSuggestions(PageViewExtension):
+class InlineSuggestions(PageViewExtension, metaclass=ABCMeta):
 
-	def __init__(self, plugin, pageview):
+	@abstractmethod
+	def fetch_suggestions(self):
+		"""
+		Return the arguments for SuggestionPopover.load_model
+		entries: an iterator
+		accessor (optional): a function for unwrapping the entries to a str
+		"""
+		return ([], lambda x: x)
+
+	def __init__(self, plugin, pageview, activation_char):
 		super().__init__(plugin, pageview)
+
+		self.activation_char = activation_char
 
 		self.startpos = LinePos(0, 0)
 		self._connected_buffer = None
 		self._buffer_signals = ()
 
-		self.popover = TagSuggestionsPopover(
+		self.popover = SuggestionsPopover(
 			self._popover_forward_keypress,
 			self._insert_selected)
 		self.popover.set_relative_to(self.pageview.textview)
@@ -69,7 +78,7 @@ class TagSuggestions(PageViewExtension):
 		if self.popover.get_visible():
 			if not self._update_popover(buffer, cursor):
 				self.popover.popdown()
-		elif text.endswith(activation_char):
+		elif text.endswith(self.activation_char):
 			self._popup_popover(cursor)
 
 		return False
@@ -86,8 +95,7 @@ class TagSuggestions(PageViewExtension):
 
 	def _popup_popover(self, cursor):
 		self.startpos = iter_to_pos(cursor)
-		tagsview = TagsView.new_from_index(self.pageview.notebook.index)
-		self.popover.load_tags(tagsview.list_all_tags())
+		self.popover.load_model(*self.fetch_suggestions())
 		location = self.pageview.textview.get_iter_location(cursor)
 		(location.x, location.y) = self.pageview.textview.buffer_to_window_coords(
 			Gtk.TextWindowType.WIDGET,  # or TEXT
@@ -157,7 +165,7 @@ class TagSuggestions(PageViewExtension):
 			self.pageview.textview, Gdk.keyval_from_name("space"), Gdk.ModifierType(0))
 
 
-class TagSuggestionsPopover(Gtk.Popover):
+class SuggestionsPopover(Gtk.Popover):
 
 	VIS_COL = 0
 	DATA_COL = 1
@@ -206,11 +214,11 @@ class TagSuggestionsPopover(Gtk.Popover):
 	def has_content(self):
 		return len(self.model) > 0
 
-	def load_tags(self, tags):
+	def load_model(self, entries, accessor=lambda x: x):
 		self.model.clear()
 
-		for tag in tags:
-			self.model.append((True, tag.name))
+		for tag in entries:
+			self.model.append((True, accessor(tag)))
 
 		if self.has_content:
 			# Reset entered name
